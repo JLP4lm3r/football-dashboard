@@ -20,7 +20,7 @@ if uploaded_file:
         st.error("No 'Player' column found in this sheet.")
         st.stop()
 
-    # Convert wide to long
+    # Convert wide format → long format
     df_long = df.melt(
         id_vars=["Player"],
         var_name="Week",
@@ -30,12 +30,13 @@ if uploaded_file:
     df_long["Week"] = pd.to_numeric(df_long["Week"], errors="coerce")
     df_long = df_long.dropna(subset=["Week"])
 
-    # 🔥 MULTI-SELECT instead of selectbox
+    # Player selection
     player_list = sorted(df_long["Player"].unique())
+
     selected_players = st.multiselect(
         "Select Players",
         player_list,
-        default=player_list[:1]  # default first player selected
+        default=player_list[:1]
     )
 
     if not selected_players:
@@ -45,12 +46,12 @@ if uploaded_file:
     filtered_df = df_long[df_long["Player"].isin(selected_players)]
     filtered_df = filtered_df.sort_values("Week")
 
-    # Optional: ignore zeros
     ignore_zeros = st.checkbox("Ignore Zero Values in Calculations", value=True)
+    show_team_mean = st.checkbox("Show Squad Mean Line", value=True)
 
     fig = go.Figure()
 
-    # --- Plot Each Player ---
+    # --- Plot selected players ---
     for player in selected_players:
 
         player_df = filtered_df[filtered_df["Player"] == player]
@@ -64,17 +65,15 @@ if uploaded_file:
             )
         )
 
-    # --- Optional Team Mean Line ---
-    show_team_mean = st.checkbox("Show Team Mean Line", value=False)
-
+    # --- Squad mean from FULL dataset ---
     if show_team_mean:
 
         if ignore_zeros:
-            calc_df = filtered_df[filtered_df["Value"] > 0]
+            calc_df = df_long[df_long["Value"] > 0]
         else:
-            calc_df = filtered_df
+            calc_df = df_long
 
-        team_mean_by_week = (
+        squad_mean_by_week = (
             calc_df.groupby("Week")["Value"]
             .mean()
             .reset_index()
@@ -82,19 +81,20 @@ if uploaded_file:
 
         fig.add_trace(
             go.Scatter(
-                x=team_mean_by_week["Week"],
-                y=team_mean_by_week["Value"],
+                x=squad_mean_by_week["Week"],
+                y=squad_mean_by_week["Value"],
                 mode="lines",
-                name="Team Weekly Mean",
+                name="Squad Weekly Mean",
                 line=dict(dash="dash", width=3)
             )
         )
 
     fig.update_layout(
-        title="Weekly Player Comparison",
+        title="Weekly Player Comparison vs Squad Mean",
         xaxis_title="Week",
         yaxis_title="Value",
-        template="plotly_white"
+        template="plotly_white",
+        height=550
     )
 
     st.plotly_chart(fig, use_container_width=True)
